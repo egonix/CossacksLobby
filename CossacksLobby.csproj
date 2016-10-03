@@ -49,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CossacksHandler.cs" />
+    <Compile Include="Network\Chat.cs" />
     <Compile Include="Network\EmailCheck.cs" />
     <Compile Include="Network\Lobby.cs" />
     <Compile Include="Network\Login.cs" />
