@@ -1,4 +1,4 @@
-﻿using CossacksLobby.CossacksPackages;
+﻿using CossacksLobby.Network;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -99,14 +99,14 @@ namespace CossacksLobby
                 Unknown4 = 0,
                 Unknown5 = 0,
                 Unknown6 = 0,
-                Players = CossacksHandler.Lobby.Players.Select(p => new CossacksPackages.Player()
+                Players = CossacksHandler.Lobby.Players.Select(p => new Network.Player()
                 {
                     ID = p.ID,
                     Icon = p.Icon,
                     Name = p.Name,
                     Rank = p.Rank,
                 }).ToList(),
-                Games = CossacksHandler.Lobby.Games.Select(g => new CossacksPackages.Game()
+                Games = CossacksHandler.Lobby.Games.Select(g => new Network.Game()
                 {
                     HostID = g.Host.ID,
                     MaxPlayers = g.MaxPlayers,
