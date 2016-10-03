@@ -47,13 +47,25 @@ namespace CossacksLobby.Network
         public PackageAttribute(PackageNumber number)
         {
             Number = number;
+            if (Number == PackageNumber.Invalid)
+                throw new ArgumentException("Invalid is not a valid PackageNumber", nameof(number));
         }
     }
 
     [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
     sealed class PackageHandlerAttribute : Attribute
     {
-        public PackageHandlerAttribute() { }
+        public PackageNumber Number { get; }
+
+        public PackageHandlerAttribute()
+            : this(PackageNumber.Invalid)
+        {
+        }
+
+        public PackageHandlerAttribute(PackageNumber number)
+        {
+            Number = number;
+        }
     }
 
     [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
@@ -126,12 +138,23 @@ namespace CossacksLobby.Network
 
         public static void Write<T>(Stream stream, int unknown1, int unknown2, T t)
         {
+            Write(stream, PackageNumber.Invalid, unknown1, unknown2, t);
+        }
+
+        public static void Write<T>(Stream stream, PackageNumber number, int unknown1, int unknown2, T t)
+        {
             Tuple<PackageNumber, Delegate> writer = Writers.GetOrAdd(typeof(T), BuildWriter);
+            if (number == PackageNumber.Invalid)
+            {
+                number = writer.Item1;
+                if (number == PackageNumber.Invalid)
+                    throw new ArgumentException("PackageNumber could not be inferred by type", nameof(number));
+            }
             byte[] buffer = new byte[Package.MaxSize];
             int offset = HeaderSize;
             ((PackageWriter<T>)writer.Item2)(t, buffer, ref offset);
             Buffer.BlockCopy(BitConverter.GetBytes(offset - HeaderSize), 0, buffer, 0, 4);
-            Buffer.BlockCopy(BitConverter.GetBytes((short)writer.Item1), 0, buffer, 4, 2);
+            Buffer.BlockCopy(BitConverter.GetBytes((short)number), 0, buffer, 4, 2);
             Buffer.BlockCopy(BitConverter.GetBytes(unknown1), 0, buffer, 6, 4);
             Buffer.BlockCopy(BitConverter.GetBytes(unknown2), 0, buffer, 10, 4);
             stream.Write(buffer, 0, offset);
@@ -140,9 +163,7 @@ namespace CossacksLobby.Network
         private static Tuple<PackageNumber, Delegate> BuildWriter(Type type)
         {
             PackageAttribute packageAttribute = type.GetCustomAttribute<PackageAttribute>();
-            if (packageAttribute == null)
-                throw new InvalidOperationException(type.Name + " is not a Package");
-            return Tuple.Create(packageAttribute.Number, PackageWriterBuilder.Build(type));
+            return Tuple.Create(packageAttribute?.Number ?? PackageNumber.Invalid, PackageWriterBuilder.Build(type));
         }
 
         public static Dispatcher<T> BuildDispatcher<T>()
@@ -150,25 +171,31 @@ namespace CossacksLobby.Network
             Type type = typeof(T);
             MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             var nodes = methods
-                .Where(m => m.GetCustomAttribute<PackageHandlerAttribute>() != null)
+                .Select(m => new { Method = m, PackageHandlerAttribute = m.GetCustomAttribute<PackageHandlerAttribute>()})
+                .Where(m => m.PackageHandlerAttribute != null)
                 .Select(m =>
                 {
-                    ParameterInfo[] parameters = m.GetParameters();
+                    ParameterInfo[] parameters = m.Method.GetParameters();
                     if (parameters.Length != 3)
-                        throw new InvalidOperationException(m.Name + " must have 3 parameters");
+                        throw new InvalidOperationException(m.Method.Name + " must have 3 parameters");
                     if (parameters[0].ParameterType != typeof(int))
-                        throw new InvalidOperationException(m.Name + " first paramter must be a int");
+                        throw new InvalidOperationException(m.Method.Name + " first paramter must be a int");
                     if (parameters[1].ParameterType != typeof(int))
-                        throw new InvalidOperationException(m.Name + " second paramter must be a int");
+                        throw new InvalidOperationException(m.Method.Name + " second paramter must be a int");
+                    PackageNumber number = m.PackageHandlerAttribute.Number;
                     Type parameterType = parameters[2].ParameterType;
-                    PackageAttribute packageAttribute = parameterType.GetCustomAttribute<PackageAttribute>();
-                    if (packageAttribute == null)
-                        throw new InvalidOperationException(m.Name + " third parameter is not a Package");
+                    if (number == PackageNumber.Invalid)
+                    {
+                        PackageAttribute packageAttribute = parameterType.GetCustomAttribute<PackageAttribute>();
+                        if (packageAttribute == null)
+                            throw new InvalidOperationException(m.Method.Name + " third parameter is not a Package");
+                        number = packageAttribute.Number;
+                    }
                     return new
                     {
-                        Method = m,
+                        Method = m.Method,
                         Type = parameterType,
-                        Number = packageAttribute.Number,
+                        Number = number,
                     };
                 });
             var defaultNode = methods.SingleOrDefault(m => m.GetCustomAttribute<UnknownPackageHandlerAttribute>() != null);
@@ -217,7 +244,7 @@ namespace CossacksLobby.Network
 
     internal class PackageTest
     {
-        [Package(PackageNumber.Invalid)]
+        [Package((PackageNumber)1)]
         class Message
         {
             public int Value { get; set; }
@@ -235,7 +262,7 @@ namespace CossacksLobby.Network
         [UnknownPackageHandler]
         Task UnknownPackage(PackageNumber number, int unknown1, int unknown2, byte[] buffer, int offset, int count)
         {
-            Assert.AreEqual((PackageNumber)1, number);
+            Assert.AreEqual((PackageNumber)2, number);
             Assert.AreEqual(1, unknown1);
             Assert.AreEqual(2, unknown2);
             Assert.IsNotNull(buffer);
@@ -250,9 +277,9 @@ namespace CossacksLobby.Network
         {
             var dispatcher = Package.BuildDispatcher<PackageTest>();
             byte[] data = new byte[] { 0x01, 0x00, 0x00, 0x00, };
-            await dispatcher(new PackageTest(), PackageNumber.Invalid, 1, 2, data, 0, data.Length);
             await dispatcher(new PackageTest(), (PackageNumber)1, 1, 2, data, 0, data.Length);
-            Assert.Catch<InvalidDataException>(() => dispatcher(new PackageTest(), PackageNumber.Invalid, 1, 2, new byte[5], 0, 5));
+            await dispatcher(new PackageTest(), (PackageNumber)2, 1, 2, data, 0, data.Length);
+            Assert.Catch<InvalidDataException>(() => dispatcher(new PackageTest(), (PackageNumber)1, 1, 2, new byte[5], 0, 5));
         }
     }
 }

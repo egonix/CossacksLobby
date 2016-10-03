@@ -75,11 +75,16 @@ namespace CossacksLobby
             }
         }
 
-        protected abstract Task HandlePackage(PackageNumber type, int unknown1, int unknown2, byte[] buffer, int offset, int count);
+        protected abstract Task HandlePackage(PackageNumber number, int unknown1, int unknown2, byte[] buffer, int offset, int count);
 
         public void Write<T>(int unknown1, int unknown2, T t)
         {
             Package.Write(Stream, unknown1, unknown2, t);
+        }
+
+        public void Write<T>(PackageNumber number, int unknown1, int unknown2, T t)
+        {
+            Package.Write(Stream, number, unknown1, unknown2, t);
         }
 
         private async Task Stop()
