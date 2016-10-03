@@ -31,7 +31,9 @@ namespace CossacksLobby.Network
 
         private static Expression BuildWriter(Type type, IEnumerable<Attribute> attributes, Expression expression, ParameterExpression buffer, ParameterExpression offset)
         {
-            if (type == typeof(Int16)) return BuildIntegerWriter(((Func<Int16, byte[]>)BitConverter.GetBytes).Method, 2, expression, buffer, offset);
+            UnknownAttribute unknownAttribute = attributes.OfType<UnknownAttribute>().SingleOrDefault();
+            if (unknownAttribute != null) return BuildUnknownWriter(unknownAttribute, expression, buffer, offset);
+            else if (type == typeof(Int16)) return BuildIntegerWriter(((Func<Int16, byte[]>)BitConverter.GetBytes).Method, 2, expression, buffer, offset);
             else if (type == typeof(Int32)) return BuildIntegerWriter(((Func<Int32, byte[]>)BitConverter.GetBytes).Method, 4, expression, buffer, offset);
             else if (type == typeof(Int64)) return BuildIntegerWriter(((Func<Int64, byte[]>)BitConverter.GetBytes).Method, 8, expression, buffer, offset);
             else if (type == typeof(UInt16)) return BuildIntegerWriter(((Func<UInt16, byte[]>)BitConverter.GetBytes).Method, 2, expression, buffer, offset);
@@ -45,6 +47,14 @@ namespace CossacksLobby.Network
             else if (type == typeof(String)) return BuildStringWriter(expression, buffer, offset);
             else if (type.IsClass) return BuildClassWriter(type, expression, buffer, offset);
             else throw new NotSupportedException();
+        }
+
+        private static Expression BuildUnknownWriter(UnknownAttribute unknownAttribute, Expression expression, ParameterExpression buffer, ParameterExpression offset)
+        {
+            Expression source = unknownAttribute.Copy ? expression : Expression.Constant(unknownAttribute.Pattern);
+            return Expression.Block(
+                Expression.Call(((Action<Array, int, Array, int, int>)Buffer.BlockCopy).Method, source, Expression.Constant(0),  buffer, offset, Expression.Constant(unknownAttribute.Pattern.Length)),
+                Expression.AddAssign(offset, Expression.Constant(unknownAttribute.Pattern.Length)));
         }
 
         private static Expression BuildIntegerWriter(MethodInfo method, int size, Expression expression, ParameterExpression buffer, ParameterExpression offset)
@@ -162,6 +172,8 @@ namespace CossacksLobby.Network
         [Length(typeof(byte))]
         public List<int> J { get; set; }
         public bool L { get; set; }
+        [Unknown("01 02 03 04")]
+        public byte[] Unknown { get; set; }
 
         [Test]
         public static void Test()
@@ -200,7 +212,8 @@ namespace CossacksLobby.Network
                 H = "Test",
                 I = new List<string>() { "1", "2", "3", "4", "5" },
                 J = new List<int>() { 1, 2, 3, 4, 5 },
-                L = true
+                L = true,
+                Unknown = null
             };
             byte[] data = Enumerable.Repeat<byte>(0xFF, 112).ToArray();
             byte[] expected = new byte[] {
@@ -210,13 +223,13 @@ namespace CossacksLobby.Network
                 0x07, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x04,
                 0x54, 0x65, 0x73, 0x74, 0x05, 0x00, 0x00, 0x00, 0x01, 0x31, 0x01, 0x32, 0x01, 0x33, 0x01, 0x34,
                 0x01, 0x35, 0x05, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04,
-                0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+                0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x01, 0x01, 0x02, 0x03, 0x04, 0xFF, 0xFF, 0xFF, 0xFF
             };
 
             var writer = PackageWriterBuilder.Build<PackageWriterTest>();
             int offset = 0;
             writer(test, data, ref offset);
-            Assert.That(offset, Is.EqualTo(104));
+            Assert.That(offset, Is.EqualTo(108));
             CollectionAssert.AreEqual(expected, data);
         }
     }
