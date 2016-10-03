@@ -131,10 +131,12 @@ namespace CossacksLobby
         public int MaxPlayers;
 
         public string Name;
+        public string Password;
         public string Options; // Options // TODO
+        public int UnknownID;
         public int unknown1;
         public Int16 unknown2;
-        public int PlayersInServer;
+        public int PlayersInServer { get { return JoinedPlayers.Count; } }
         public List<Player> JoinedPlayers = new List<Player>(); // int[] ID
 
         public Game()
@@ -142,7 +144,7 @@ namespace CossacksLobby
 
         public override string ToString()
         {
-            return string.Format("[{0}({1})] {2} {3}/{4}", Host.Name, Host.ID, Name, JoinedPlayers.Count, MaxPlayers);
+            return string.Format("[{0}({1})] {2} {3}/{4}", Host.Name, Host.ID, Name, PlayersInServer, MaxPlayers);
         }
     }
 }

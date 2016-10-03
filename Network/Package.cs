@@ -27,10 +27,10 @@ namespace CossacksLobby.Network
         RoomInfoResponse = 0x01A5,
         RoomLeaveRequest = 0x01A0,
         RoomLeaveResponse = 0x01A1,
+        //StartGame: 0x01BB, 0x01A2, 0x456, 0x457, 0x460, 0x461
         //0x019F 
         //0x01A1 
         //0x01A3 
-        NewGame = 0x01A5, //rename
         NewPlayer = 0x01A6,
         //0x01A7 
         EmailCheckRequest = 0x01A8,

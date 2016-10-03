@@ -18,6 +18,8 @@ namespace CossacksLobby
         public DBAccount Account { get; private set; }
         public Player Player { get; private set; }
 
+        public Game Room { get; private set; }
+
         public Session(Server server, TcpClient client) : base(server, client)
         {
         }
@@ -89,40 +91,58 @@ namespace CossacksLobby
         [PackageHandler]
         private void NewRoom(int clientID, int unknown, CreateRoomRequest request)
         {
+            Player host = CossacksHandler.Lobby.Players.FirstOrDefault(p => p.ID == clientID);
+            string[] np = request.NamePassword.Split(new char[] { (char)0x09 });
+            Room = new Game()
+            {
+                Host = host,
+                Name = np[0],
+                Password = np[1],
+
+            };
+
             Write(clientID, unknown, new CreateRoomResponse()
             {
-                Size1 = request.Size1, // 07
+                Size1 = request.Size1,
                 Size2 = (int)request.Size1, // 00 00 00 00 => 07 00 00 00
                 NamePassword = request.NamePassword,
                 unknown6 = request.unknown6,
             });
+
+            Room.JoinedPlayers.Add(host);
+            CossacksHandler.Lobby.Games.Add(Room);
         }
 
         [PackageHandler]
         private void RoomInfo1(int clientID, int unknown, RoomInfoRequest1 request)
-        { /* Ignored */ }
+        {
+            Room.Options = request.Options;
+            Room.MaxPlayers = request.Size;
+            Room.UnknownID = request.Unknown;
+        }
 
         [PackageHandler]
         private void RoomInfo2(int clientID, int unknown, RoomInfoRequest2 request)
         {
+            Room.Options = request.Options;
             Write(clientID, unknown, new RoomInfoResponse()
             {
-                Size1 = 7,
+                Size1 = Room.MaxPlayers,
                 NamePassword = request.NamePassword,
-                Options = request.Options,
-                JoinedPlayerIDs = new List<int>()
-                {
-                    clientID,
-                },
-                Unknown1 = 0,
-                Unknown2 = 0,
-                Size2 = 0x07,
+                Options = Room.Options,
+                JoinedPlayerIDs = Room.JoinedPlayers.Select(p => p.ID).ToList(),
+                Unknown1 = Room.unknown1,
+                Unknown2 = Room.unknown2,
+                Size2 = (byte)Room.MaxPlayers,
             });
         }
 
         [PackageHandler]
         private void LeaveRoom(int clientID, int unknown, RoomLeaveRequest request)
         {
+            if (Room.Host.ID == clientID)
+                CossacksHandler.Lobby.Games.Remove(Room);
+
             Write(clientID, unknown, new RoomLeaveResponse()
             {
                 unknown1 = 0x01,
@@ -130,6 +150,8 @@ namespace CossacksLobby
                 PlayerID = clientID,
                 unknown3 = 0x01,
             });
+
+            Room = null;
         }
 
         private void EnterLobby()
