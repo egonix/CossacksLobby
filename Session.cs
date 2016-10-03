@@ -86,6 +86,52 @@ namespace CossacksLobby
             });
         }
 
+        [PackageHandler]
+        private void NewRoom(int clientID, int unknown, CreateRoomRequest request)
+        {
+            Write(clientID, unknown, new CreateRoomResponse()
+            {
+                Size1 = request.Size1, // 07
+                Size2 = (int)request.Size1, // 00 00 00 00 => 07 00 00 00
+                NamePassword = request.NamePassword,
+                unknown6 = request.unknown6,
+            });
+        }
+
+        [PackageHandler]
+        private void RoomInfo1(int clientID, int unknown, RoomInfoRequest1 request)
+        { /* Ignored */ }
+
+        [PackageHandler]
+        private void RoomInfo2(int clientID, int unknown, RoomInfoRequest2 request)
+        {
+            Write(clientID, unknown, new RoomInfoResponse()
+            {
+                Size1 = 7,
+                NamePassword = request.NamePassword,
+                Options = request.Options,
+                JoinedPlayerIDs = new List<int>()
+                {
+                    clientID,
+                },
+                Unknown1 = 0,
+                Unknown2 = 0,
+                Size2 = 0x07,
+            });
+        }
+
+        [PackageHandler]
+        private void LeaveRoom(int clientID, int unknown, RoomLeaveRequest request)
+        {
+            Write(clientID, unknown, new RoomLeaveResponse()
+            {
+                unknown1 = 0x01,
+                unknown2 = 1,
+                PlayerID = clientID,
+                unknown3 = 0x01,
+            });
+        }
+
         private void EnterLobby()
         {
             CossacksHandler.Lobby.AddPlayer(Player);

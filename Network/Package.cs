@@ -12,11 +12,6 @@ using System.Threading.Tasks;
 
 namespace CossacksLobby.Network
 {
-        //CreateRoomRequest = 0x019C,
-        //CreateRoomResponse = 0x019D,
-        //RoomHostPcInfoSend = 0x008C,
-        //RoomGameOptionsSend = 0x01AA,
-
     enum PackageNumber : ushort
     {
         Invalid = 0,
@@ -25,10 +20,17 @@ namespace CossacksLobby.Network
         CreateAccountRequest = 0x0198,
         LoginRequest = 0x019A,
         EnterLobby = 0x019B,
+        CreateRoomRequest = 0x019C,
+        CreateRoomResponse = 0x019D,
+        RoomInfoRequest1 = 0x00C8,
+        RoomInfoRequest2 = 0x01AA,
+        RoomInfoResponse = 0x01A5,
+        RoomLeaveRequest = 0x01A0,
+        RoomLeaveResponse = 0x01A1,
         //0x019F 
         //0x01A1 
         //0x01A3 
-        NewGame = 0x01A5,
+        NewGame = 0x01A5, //rename
         NewPlayer = 0x01A6,
         //0x01A7 
         EmailCheckRequest = 0x01A8,
