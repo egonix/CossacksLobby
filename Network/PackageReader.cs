@@ -43,7 +43,7 @@ namespace CossacksLobby.Network
                return BuildByteReader(expression, ConvertByteToBoolean(transform), buffer, offset);
             else if (type.IsEnum) return BuildAssigment(type.GetEnumUnderlyingType(), attributes, expression, Convert(transform, type), buffer, offset);
             else if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)) return BuildListReader(type, attributes, expression, type.GetGenericArguments().Single(), transform, buffer, offset);
-            else if (type == typeof(String)) return BuildStringReader(expression, transform, buffer, offset);
+            else if (type == typeof(String)) return BuildStringReader(expression, attributes, transform, buffer, offset);
             else if (type.IsClass) return BuildClassReader(type, expression, transform, buffer, offset);
             else throw new NotSupportedException();
         }
@@ -62,14 +62,16 @@ namespace CossacksLobby.Network
                 Expression.AddAssign(offset, Expression.Constant(1)));
         }
 
-        private static Expression BuildStringReader(Expression expression, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
+        private static Expression BuildStringReader(Expression expression, IEnumerable<Attribute> attributes, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
         {
-            Expression length = Expression.Convert(Expression.Convert(Expression.ArrayIndex(buffer, offset), typeof(Byte)), typeof(int));
+            Type lengthType = attributes.OfType<LengthAttribute>().FirstOrDefault()?.Type ?? typeof(Byte);
             Encoding encoding = Encoding.UTF8;
             MethodInfo method = ((Func<byte[], int, int, string>)encoding.GetString).Method;
-            return Expression.Block(
-                Expression.Assign(expression, Expression.Call(Expression.Constant(encoding), method, buffer, Expression.Add(offset, Expression.Constant(1)), length)),
-                Expression.AddAssign(offset, Expression.Add(length, Expression.Constant(1))));
+            ParameterExpression length = Expression.Variable(typeof(int));
+            return Expression.Block(new ParameterExpression[] { length },
+                BuildAssigment(lengthType, NoAttributes, length, Convert(Identity, typeof(int)), buffer, offset),
+                Expression.Assign(expression, Expression.Call(Expression.Constant(encoding), method, buffer, offset, length)),
+                Expression.AddAssign(offset, length));
         }
 
         private static Expression BuildClassReader(Type type, Expression expression, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)

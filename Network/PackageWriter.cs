@@ -42,7 +42,7 @@ namespace CossacksLobby.Network
             else if (type == typeof(Boolean)) return BuildByteWriter(ConvertBooleanToByte(expression), buffer, offset);
             else if (type.IsEnum) return BuildWriter(type.GetEnumUnderlyingType(), attributes, Expression.Convert(expression, type.GetEnumUnderlyingType()), buffer, offset);
             else if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)) return BuildListWriter(type, attributes, expression, type.GetGenericArguments().Single(), buffer, offset);
-            else if (type == typeof(String)) return BuildStringWriter(expression, buffer, offset);
+            else if (type == typeof(String)) return BuildStringWriter(expression, attributes, buffer, offset);
             else if (type.IsClass) return BuildClassWriter(type, expression, buffer, offset);
             else throw new NotSupportedException();
         }
@@ -62,15 +62,18 @@ namespace CossacksLobby.Network
                 Expression.AddAssign(offset, Expression.Constant(1)));
         }
 
-        private static Expression BuildStringWriter(Expression expression, ParameterExpression buffer, ParameterExpression offset)
+        private static Expression BuildStringWriter(Expression expression, IEnumerable<Attribute> attributes, ParameterExpression buffer, ParameterExpression offset)
         {
+            Type lengthType = attributes.OfType<LengthAttribute>().FirstOrDefault()?.Type ?? typeof(Byte);
+            int sizeOfLength = System.Runtime.InteropServices.Marshal.SizeOf(lengthType);
             Encoding encoding = Encoding.UTF8;
             MethodInfo getByteCount = ((Func<string, int>)encoding.GetByteCount).Method;
             MethodInfo getBytes = ((Func<string, int, int, byte[], int, int>)encoding.GetBytes).Method;
-            Expression length = Expression.Property(expression, "Length");
-            return Expression.Block(
-                BuildWriter(typeof(Byte), NoAttributes, Expression.ConvertChecked(Expression.Call(Expression.Constant(encoding), getByteCount, expression), typeof(Byte)), buffer, offset),
-                Expression.AddAssign(offset, Expression.Call(Expression.Constant(encoding), getBytes, expression, Expression.Constant(0), Expression.Property(expression, "Length"), buffer, offset)));
+            ParameterExpression length = Expression.Variable(typeof(int));
+            return Expression.Block(new ParameterExpression[] { length },
+                Expression.Assign(length, Expression.Call(Expression.Constant(encoding), getBytes, expression, Expression.Constant(0), Expression.Property(expression, "Length"), buffer, Expression.Add(offset, Expression.Constant(sizeOfLength)))),
+                BuildWriter(lengthType, NoAttributes, Expression.ConvertChecked(length, lengthType), buffer, offset),
+                Expression.AddAssign(offset, length));
         }
 
         private static Expression BuildClassWriter(Type type, Expression expression, ParameterExpression buffer, ParameterExpression offset)
