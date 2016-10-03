@@ -95,6 +95,26 @@ namespace CossacksLobby.Network
         }
     }
 
+    [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = false)]
+    sealed class UnknownAttribute : Attribute
+    {
+        public byte[] Pattern { get; }
+        public bool Validate { get; set; }
+        public bool Copy { get; set; }
+
+        public UnknownAttribute(string pattern)
+        {
+            pattern = pattern.Replace(" ", string.Empty);
+            if ((pattern.Length % 2) != 0) throw new ArgumentException();
+            Pattern = Enumerable.Range(0, pattern.Length / 2)
+                .Select(i => pattern.Substring(i * 2, 2))
+                .Select(b => Convert.ToByte(b, 16))
+                .ToArray();
+            Validate = true;
+            Copy = false;
+        }
+    }
+
     delegate Task Dispatcher<T>(T t, PackageNumber number, int unknown1, int unknown2, byte[] buffer, int offset, int count);
 
     static class Package

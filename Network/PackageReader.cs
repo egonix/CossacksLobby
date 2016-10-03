@@ -1,6 +1,7 @@
 ﻿using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -31,7 +32,9 @@ namespace CossacksLobby.Network
 
         private static Expression BuildAssigment(Type type, IEnumerable<Attribute> attributes, Expression expression, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
         {
-            if (type == typeof(Int16)) return BuildIntegerReader(((Func<byte[], int, Int16>)BitConverter.ToInt16).Method, 2, expression, transform, buffer, offset);
+            UnknownAttribute unknownAttribute = attributes.OfType<UnknownAttribute>().SingleOrDefault();
+            if (unknownAttribute != null) return BuildUnknownReader(unknownAttribute, expression, transform, buffer, offset);
+            else if (type == typeof(Int16)) return BuildIntegerReader(((Func<byte[], int, Int16>)BitConverter.ToInt16).Method, 2, expression, transform, buffer, offset);
             else if (type == typeof(Int32)) return BuildIntegerReader(((Func<byte[], int, Int32>)BitConverter.ToInt32).Method, 4, expression, transform, buffer, offset);
             else if (type == typeof(Int64)) return BuildIntegerReader(((Func<byte[], int, Int64>)BitConverter.ToInt64).Method, 8, expression, transform, buffer, offset);
             else if (type == typeof(UInt16)) return BuildIntegerReader(((Func<byte[], int, UInt16>)BitConverter.ToUInt16).Method, 2, expression, transform, buffer, offset);
@@ -39,13 +42,46 @@ namespace CossacksLobby.Network
             else if (type == typeof(UInt64)) return BuildIntegerReader(((Func<byte[], int, UInt64>)BitConverter.ToUInt64).Method, 8, expression, transform, buffer, offset);
             else if (type == typeof(Byte)) return BuildByteReader(expression, transform, buffer, offset);
             else if (type == typeof(SByte)) return BuildByteReader(expression, Convert(transform, type), buffer, offset);
-            else if (type == typeof(Boolean))
-               return BuildByteReader(expression, ConvertByteToBoolean(transform), buffer, offset);
+            else if (type == typeof(Boolean)) return BuildByteReader(expression, ConvertByteToBoolean(transform), buffer, offset);
             else if (type.IsEnum) return BuildAssigment(type.GetEnumUnderlyingType(), attributes, expression, Convert(transform, type), buffer, offset);
             else if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)) return BuildListReader(type, attributes, expression, type.GetGenericArguments().Single(), transform, buffer, offset);
             else if (type == typeof(String)) return BuildStringReader(expression, attributes, transform, buffer, offset);
             else if (type.IsClass) return BuildClassReader(type, expression, transform, buffer, offset);
             else throw new NotSupportedException();
+        }
+
+        private static Expression BuildUnknownReader(UnknownAttribute unknownAttribute, Expression expression, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
+        {
+            List<Expression> parts = new List<Expression>();
+            if (unknownAttribute.Validate)
+            {
+                ParameterExpression i = Expression.Parameter(offset.Type);
+                LabelTarget exit = Expression.Label();
+                parts.Add(Expression.Block(new ParameterExpression[] { i },
+                    Expression.Assign(i, Expression.Constant(System.Convert.ChangeType(0, i.Type))),
+                    Expression.Loop(
+                        Expression.IfThenElse(
+                            Expression.Equal(i, Expression.Constant(unknownAttribute.Pattern.Length)),
+                            Expression.Break(exit),
+                            Expression.IfThen(
+                                Expression.NotEqual(Expression.ArrayAccess(buffer, Expression.Add(offset, i)), Expression.ArrayAccess(Expression.Constant(unknownAttribute.Pattern), Expression.PostIncrementAssign(i))),
+                                Expression.Throw(Expression.New(typeof(InvalidDataException))))),
+                        exit)));
+            }
+            if (unknownAttribute.Copy)
+            {
+                ParameterExpression result = Expression.Variable(typeof(byte[]));
+                parts.Add(Expression.Block(new ParameterExpression[] { result },
+                    Expression.Assign(result, Expression.NewArrayBounds(result.Type.GetElementType(), Expression.Constant(unknownAttribute.Pattern.Length))),
+                    Expression.Call(((Action<Array, int, Array, int, int>)Buffer.BlockCopy).Method, buffer, offset, result, Expression.Constant(0), Expression.Constant(unknownAttribute.Pattern.Length)),
+                    Expression.Assign(expression, transform(result))));
+            }
+            else
+            {
+                parts.Add(Expression.Assign(expression, Expression.Constant(null, typeof(byte[]))));
+            }
+            parts.Add(Expression.AddAssign(offset, Expression.Constant(unknownAttribute.Pattern.Length)));
+            return Expression.Block(parts);
         }
 
         private static Expression BuildIntegerReader(MethodInfo method, int size, Expression expression, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
@@ -195,6 +231,8 @@ namespace CossacksLobby.Network
         [Length(typeof(byte))]
         public List<int> J { get; set; }
         public bool L { get; set; }
+        [Unknown("01 02 03 04", Copy = true, Validate = true)]
+        public byte[] Unknown { get; set; }
 
         [Test]
         public static void Test()
@@ -207,11 +245,11 @@ namespace CossacksLobby.Network
                 0x07, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x04,
                 0x00, 0x54, 0x65, 0x73, 0x74, 0x05, 0x00, 0x00, 0x00, 0x01, 0x31, 0x01, 0x32, 0x01, 0x33, 0x01,
                 0x34, 0x01, 0x35, 0x05, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-                0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x01, 0x01, 0x02, 0x03, 0x04, 0xFF, 0xFF, 0xFF,
             };
             var reader = PackageReaderBuilder.Build<PackageReaderTest>();
             var test = reader(data, ref offset);
-            Assert.That(offset, Is.EqualTo(105));
+            Assert.That(offset, Is.EqualTo(109));
             Assert.That(test.A, Is.EqualTo(1));
             Assert.That(test.B, Is.EqualTo(2));
             Assert.That(test.C, Is.EqualTo(3));
@@ -244,6 +282,11 @@ namespace CossacksLobby.Network
             Assert.That(test.J[3], Is.EqualTo(4));
             Assert.That(test.J[4], Is.EqualTo(5));
             Assert.That(test.L, Is.EqualTo(true));
+            Assert.That(test.Unknown, Has.Length.EqualTo(4));
+            Assert.That(test.Unknown[0], Is.EqualTo(1));
+            Assert.That(test.Unknown[1], Is.EqualTo(2));
+            Assert.That(test.Unknown[2], Is.EqualTo(3));
+            Assert.That(test.Unknown[3], Is.EqualTo(4));
         }
     }
 }
