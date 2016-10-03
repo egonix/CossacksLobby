@@ -162,11 +162,6 @@ namespace CossacksLobby
                 Unknown1 = 0, // 0 = Bugs (Players)
                 Nickname = Account.Name,
                 Rank = Account.Rank,
-                Unknown2 = 0,
-                Unknown3 = 0,
-                Unknown4 = 0,
-                Unknown5 = 0,
-                Unknown6 = 0,
                 Players = CossacksHandler.Lobby.Players.Select(p => new Network.Player()
                 {
                     ID = p.ID,
