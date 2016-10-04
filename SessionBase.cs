@@ -9,23 +9,32 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CossacksLobby
+namespace CossacksLobby.Network
 {
     abstract class SessionBase : IDisposable
     {
-        private Server Server;
+        private static int LastId = 0;
+
+        public int ID { get; }
+        public Server Server { get; }
+        public Persistent Persistent { get { return Server.Persistent; } }
+        public NetworkStream Stream { get; }
         private TcpClient Client;
-        private NetworkStream Stream;
         private CancellationTokenSource Cancellation;
         private Task Task;
 
         public SessionBase(Server server, TcpClient client)
         {
+            int id;
+            do id = Interlocked.Increment(ref LastId);
+            while (id == 0);
+            ID = id;
             Client = client;
             Stream = client.GetStream();
             Server = server;
             Cancellation = new CancellationTokenSource();
-            Task = Loop();
+            Task = Task.Run(Loop);
+            Task.ContinueWith(_ => OnExit());
         }
 
         private async Task Loop()
@@ -87,10 +96,14 @@ namespace CossacksLobby
             Package.Write(Stream, number, unknown1, unknown2, t);
         }
 
-        private async Task Stop()
+        public async Task Stop()
         {
             Cancellation.Cancel();
             await Task;
+        }
+
+        protected virtual void OnExit()
+        {
         }
 
         public void Dispose()

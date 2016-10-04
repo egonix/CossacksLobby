@@ -48,20 +48,25 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CossacksHandler.cs" />
-    <Compile Include="Network\Chat.cs" />
-    <Compile Include="Network\EmailCheck.cs" />
-    <Compile Include="Network\Lobby.cs" />
-    <Compile Include="Network\Login.cs" />
-    <Compile Include="Network\Package.cs" />
-    <Compile Include="Network\PackageWriter.cs" />
-    <Compile Include="Network\PackageReader.cs" />
-    <Compile Include="Network\Packetizer.cs" />
+    <Compile Include="Log.cs" />
+    <Compile Include="Session\Chat.cs" />
+    <Compile Include="Session\EmailCheck.cs" />
+    <Compile Include="Session\Lobby.cs" />
+    <Compile Include="Session\Login.cs" />
+    <Compile Include="Session\Package.cs" />
+    <Compile Include="Session\PackageWriter.cs" />
+    <Compile Include="Session\PackageReader.cs" />
+    <Compile Include="Session\Packetizer.cs" />
+    <Compile Include="Persistent\Account.cs" />
+    <Compile Include="Persistent\Persitent.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="Session.cs" />
     <Compile Include="SessionBase.cs" />
+    <Compile Include="Temporary\Lobby.cs" />
+    <Compile Include="Temporary\Room.cs" />
+    <Compile Include="Temporary\Temporary.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -70,6 +75,7 @@
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

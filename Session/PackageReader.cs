@@ -6,14 +6,25 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace CossacksLobby.Network
+namespace CossacksLobby
 {
     internal delegate T PackageReader<T>(byte[] buffer, ref int offset);
 
     internal static class PackageReaderBuilder
     {
+        private static Type[] TupleTypes = new Type[]
+        {
+            typeof(Tuple<>),
+            typeof(Tuple<,>),
+            typeof(Tuple<,,>),
+            typeof(Tuple<,,,>),
+            typeof(Tuple<,,,,>),
+            typeof(Tuple<,,,,,>),
+            typeof(Tuple<,,,,,,>)
+        };
+
+
         public static PackageReader<T> Build<T>()
         {
             return (PackageReader<T>)Build(typeof(T));
@@ -25,7 +36,7 @@ namespace CossacksLobby.Network
             ParameterExpression offset = Expression.Parameter(typeof(int).MakeByRefType());
 
             ParameterExpression result = Expression.Variable(type);
-            Expression[] block = new Expression[] { BuildAssigment(result.Type, NoAttributes, result, Identity, buffer, offset) };
+            Expression[] block = new Expression[] { BuildAssigment(result.Type, NoAttributes, result, Identity, buffer, offset), result };
             Expression body = Expression.Block(new ParameterExpression[] { result }, block);
             return Expression.Lambda(typeof(PackageReader<>).MakeGenericType(type), body, buffer, offset).Compile();
         }
@@ -33,6 +44,8 @@ namespace CossacksLobby.Network
         private static Expression BuildAssigment(Type type, IEnumerable<Attribute> attributes, Expression expression, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
         {
             UnknownAttribute unknownAttribute = attributes.OfType<UnknownAttribute>().SingleOrDefault();
+            Type genericType = type.IsGenericType ? type.GetGenericTypeDefinition() : null;
+            Type[] genericArguments = type.IsGenericType ? type.GetGenericArguments() : null;
             if (unknownAttribute != null) return BuildUnknownReader(unknownAttribute, expression, transform, buffer, offset);
             else if (type == typeof(Int16)) return BuildIntegerReader(((Func<byte[], int, Int16>)BitConverter.ToInt16).Method, 2, expression, transform, buffer, offset);
             else if (type == typeof(Int32)) return BuildIntegerReader(((Func<byte[], int, Int32>)BitConverter.ToInt32).Method, 4, expression, transform, buffer, offset);
@@ -44,7 +57,8 @@ namespace CossacksLobby.Network
             else if (type == typeof(SByte)) return BuildByteReader(expression, Convert(transform, type), buffer, offset);
             else if (type == typeof(Boolean)) return BuildByteReader(expression, ConvertByteToBoolean(transform), buffer, offset);
             else if (type.IsEnum) return BuildAssigment(type.GetEnumUnderlyingType(), attributes, expression, Convert(transform, type), buffer, offset);
-            else if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)) return BuildListReader(type, attributes, expression, type.GetGenericArguments().Single(), transform, buffer, offset);
+            else if (genericType == typeof(List<>)) return BuildListReader(type, attributes, expression, genericArguments.Single(), transform, buffer, offset);
+            else if (TupleTypes.Contains(genericType)) return BuildTupleReader(type, expression, genericArguments, transform, buffer, offset);
             else if (type == typeof(String)) return BuildStringReader(expression, attributes, transform, buffer, offset);
             else if (type.IsClass) return BuildClassReader(type, expression, transform, buffer, offset);
             else throw new NotSupportedException();
@@ -137,6 +151,16 @@ namespace CossacksLobby.Network
             else
                 return BuildZeroTerminatedListReader(type, attributes, expression, itemType, zeroTerminatedType, transform, buffer, offset);
         }
+
+        private static Expression BuildTupleReader(Type type, Expression expression, Type[] genericArguments, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
+        {
+            ParameterExpression[] items = genericArguments.Select(Expression.Variable).ToArray();
+            List<Expression> expressions = new List<Expression>();
+            expressions.AddRange(items.Select(item => BuildAssigment(item.Type, NoAttributes, item, Identity, buffer, offset)));
+            expressions.Add(Expression.Assign(expression, transform(Expression.Call(typeof(Tuple), "Create", genericArguments, items))));
+            return Expression.Block(items, expressions);
+        }
+
 
         private static Expression BuildPrefixLengthListReader(Type type, IEnumerable<Attribute> attributes, Expression expression, Type lengthType, Type itemType, Func<Expression, Expression> transform, ParameterExpression buffer, ParameterExpression offset)
         {

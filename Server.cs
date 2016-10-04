@@ -6,59 +6,93 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
+using System.Threading;
 
 namespace CossacksLobby
 {
-    class Server: IDisposable
+    class Server
     {
-        private TcpListener Listener;
-        public LinkedList<Session> Sessions { get; } = new LinkedList<Session>();
+        public IPEndPoint LocalEndpoint { get; }
+        public Persistent Persistent { get; }
+        public Temporary Temporary { get; }
+        public CancellationToken CancellationToken { get; }
 
-        public Server(IPEndPoint localEndpoint)
+        private List<Session> Sessions { get; }
+        private ReaderWriterLockSlim SessionsLock { get;}
+
+        public Server(IPEndPoint localEndpoint, CancellationToken cancellationToken)
         {
-            Listener = new TcpListener(localEndpoint);
-            ListenerLoop();
+            LocalEndpoint = localEndpoint;
+            CancellationToken = cancellationToken;
+            Persistent = new Persistent(Path.GetDirectoryName(typeof(Server).Assembly.FullName));
+            Temporary = new Temporary(this);
+            Sessions = new List<Session>();
+            SessionsLock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+            Task.Run(UpdateLoop, CancellationToken);
+            Task.Run(ListenerLoop, CancellationToken);
+            CancellationToken.Register(KillAllSessions);
         }
 
-        private async void ListenerLoop()
+        public void Remove(Session session)
         {
-            Listener.Start();
+            SessionsLock.EnterWriteLock();
+            session.Stop().Wait();
+            SessionsLock.ExitWriteLock();
+        }
 
-            while (true)
+        public void Write<T>(IEnumerable<Session> sessions, int unknown1, int unknown2, T t)
+        {
+            Package.Write(sessions.Select(s => s.Stream), unknown1, unknown2, t);
+        }
+
+        public void Write<T>(IEnumerable<Session> sessions, PackageNumber number, int unknown1, int unknown2, T t)
+        {
+            Package.Write(sessions.Select(s => s.Stream), number, unknown1, unknown2, t);
+        }
+
+        private async Task UpdateLoop()
+        {
+            DateTime nextRun = DateTime.Now;
+            while (CancellationToken.IsCancellationRequested == false)
             {
+                TimeSpan waitTime = nextRun - DateTime.Now;
+                if (waitTime > TimeSpan.Zero)
+                    await Task.Delay(waitTime, CancellationToken);
+                Persistent.Save();
+                nextRun += TimeSpan.FromMinutes(5);
+            }
+        }
+
+        private async Task ListenerLoop()
+        {
+            TcpListener listener = new TcpListener(LocalEndpoint);
+            listener.Start();
+            CancellationToken.Register(listener.Stop);
+            while (CancellationToken.IsCancellationRequested == false)
+            {
+                TcpClient client;
                 try
                 {
-                    TcpClient client = await Listener.AcceptTcpClientAsync();
-                    Console.WriteLine($"new connection from {client.Client.RemoteEndPoint}");
-                    Sessions.AddLast(new Session(this, client));
+                    client = await listener.AcceptTcpClientAsync();
                 }
-                catch (InvalidOperationException) { return; }
-            }
-        }
-
-   
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-       
-        ~Server()
-        {
-            Dispose(false);
-        }
-
-        protected virtual void Dispose(bool disposed)
-        {
-            if (disposed)
-            {
-                Listener.Stop();
-                lock (Sessions)
+                catch (SocketException)
                 {
-                    while (Sessions.First != null)
-                        Sessions.First.Value.Dispose();
+                    System.Diagnostics.Debug.Assert(CancellationToken.IsCancellationRequested);
+                    return;
                 }
+                Log.Info($"new connection from {client.Client.RemoteEndPoint}");
+                SessionsLock.EnterWriteLock();
+                Sessions.Add(new Session(this, client));
+                SessionsLock.ExitWriteLock();
             }
+        }
+
+        private void KillAllSessions()
+        {
+            SessionsLock.EnterWriteLock();
+            Task.WaitAll(Sessions.Select(s => s.Stop()).ToArray());
+            SessionsLock.ExitWriteLock();
         }
     }
 }

@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CossacksLobby.Network
+namespace CossacksLobby
 {
     enum PackageNumber : ushort
     {
@@ -144,6 +144,27 @@ namespace CossacksLobby.Network
 
         public static void Write<T>(Stream stream, PackageNumber number, int unknown1, int unknown2, T t)
         {
+            byte[] buffer;
+            int offset;
+            Write(number, unknown1, unknown2, t, out buffer, out offset);
+            stream.Write(buffer, 0, offset);
+        }
+        public static void Write<T>(IEnumerable<Stream> streams, int unknown1, int unknown2, T t)
+        {
+            Write(streams, PackageNumber.Invalid, unknown1, unknown2, t);
+        }
+
+        public static void Write<T>(IEnumerable<Stream> streams, PackageNumber number, int unknown1, int unknown2, T t)
+        {
+            byte[] buffer;
+            int offset;
+            Write(number, unknown1, unknown2, t, out buffer, out offset);
+            foreach (Stream stream in streams)
+                stream.Write(buffer, 0, offset);
+        }
+
+        private static void Write<T>(PackageNumber number, int unknown1, int unknown2, T t, out byte[] buffer, out int offset)
+        {
             Tuple<PackageNumber, Delegate> writer = Writers.GetOrAdd(typeof(T), BuildWriter);
             if (number == PackageNumber.Invalid)
             {
@@ -151,14 +172,13 @@ namespace CossacksLobby.Network
                 if (number == PackageNumber.Invalid)
                     throw new ArgumentException("PackageNumber could not be inferred by type", nameof(number));
             }
-            byte[] buffer = new byte[Package.MaxSize];
-            int offset = HeaderSize;
+            buffer = new byte[Package.MaxSize];
+            offset = HeaderSize;
             ((PackageWriter<T>)writer.Item2)(t, buffer, ref offset);
             Buffer.BlockCopy(BitConverter.GetBytes(offset - HeaderSize), 0, buffer, 0, 4);
             Buffer.BlockCopy(BitConverter.GetBytes((short)number), 0, buffer, 4, 2);
             Buffer.BlockCopy(BitConverter.GetBytes(unknown1), 0, buffer, 6, 4);
             Buffer.BlockCopy(BitConverter.GetBytes(unknown2), 0, buffer, 10, 4);
-            stream.Write(buffer, 0, offset);
         }
 
         private static Tuple<PackageNumber, Delegate> BuildWriter(Type type)
@@ -177,20 +197,28 @@ namespace CossacksLobby.Network
                 .Select(m =>
                 {
                     ParameterInfo[] parameters = m.Method.GetParameters();
-                    if (parameters.Length != 3)
+                    if (parameters.Length != 2 && parameters.Length != 3)
                         throw new InvalidOperationException(m.Method.Name + " must have 3 parameters");
                     if (parameters[0].ParameterType != typeof(int))
                         throw new InvalidOperationException(m.Method.Name + " first paramter must be a int");
                     if (parameters[1].ParameterType != typeof(int))
                         throw new InvalidOperationException(m.Method.Name + " second paramter must be a int");
                     PackageNumber number = m.PackageHandlerAttribute.Number;
-                    Type parameterType = parameters[2].ParameterType;
-                    if (number == PackageNumber.Invalid)
+                    Type parameterType;
+                    if (parameters.Length > 2)
                     {
-                        PackageAttribute packageAttribute = parameterType.GetCustomAttribute<PackageAttribute>();
-                        if (packageAttribute == null)
-                            throw new InvalidOperationException(m.Method.Name + " third parameter is not a Package");
-                        number = packageAttribute.Number;
+                        parameterType = parameters[2].ParameterType;
+                        if (number == PackageNumber.Invalid)
+                        {
+                            PackageAttribute packageAttribute = parameterType.GetCustomAttribute<PackageAttribute>();
+                            if (packageAttribute == null)
+                                throw new InvalidOperationException(m.Method.Name + " third parameter is not a Package");
+                            number = packageAttribute.Number;
+                        }
+                    }
+                    else
+                    {
+                        parameterType = null;
                     }
                     return new
                     {
@@ -219,17 +247,29 @@ namespace CossacksLobby.Network
             SwitchCase[] cases = nodes
                 .Select(c =>
                 {
-                    Delegate @delegate = PackageReaderBuilder.Build(c.Type);
-                    Type delegateType = @delegate.GetType();
-                    MethodInfo invoke = delegateType.GetMethod("Invoke");
-                    ParameterExpression package = Expression.Variable(c.Type);
-                    Expression block = Expression.Block(new ParameterExpression[] { package },
-                        Expression.Assign(package, Expression.Call(Expression.Constant(@delegate, delegateType), invoke, buffer, offset)),
+                    Expression offsetCheck =
                         Expression.IfThen(
                             Expression.NotEqual(offset, finalOffset),
-                            Expression.Throw(Expression.New(typeof(InvalidDataException).GetConstructor(new Type[] { typeof(string) }), Expression.Constant("offsets for '" + c.Method.Name + "'do not match!")))),
-                        Expression.Break(exit, wrapHandlerCall(Expression.Call(t, c.Method, unknown1, unknown2, package), c.Method.ReturnType)));
-                    return Expression.SwitchCase(block, Expression.Constant(c.Number));
+                            Expression.Throw(Expression.New(typeof(InvalidDataException).GetConstructor(new Type[] { typeof(string) }), Expression.Constant("offsets for '" + c.Method.Name + "'do not match!"))));
+                    if (c.Type != null)
+                    {
+                        Delegate @delegate = PackageReaderBuilder.Build(c.Type);
+                        Type delegateType = @delegate.GetType();
+                        MethodInfo invoke = delegateType.GetMethod("Invoke");
+                        ParameterExpression package = Expression.Variable(c.Type);
+                        Expression block = Expression.Block(new ParameterExpression[] { package },
+                            Expression.Assign(package, Expression.Call(Expression.Constant(@delegate, delegateType), invoke, buffer, offset)),
+                            offsetCheck,
+                            Expression.Break(exit, wrapHandlerCall(Expression.Call(t, c.Method, unknown1, unknown2, package), c.Method.ReturnType)));
+                        return Expression.SwitchCase(block, Expression.Constant(c.Number));
+                    }
+                    else
+                    {
+                        Expression block = Expression.Block(
+                            offsetCheck,
+                            Expression.Break(exit, wrapHandlerCall(Expression.Call(t, c.Method, unknown1, unknown2), c.Method.ReturnType)));
+                        return Expression.SwitchCase(block, Expression.Constant(c.Number));
+                    }
                 })
                 .ToArray();
             Expression defaultHandler = Expression.Break(exit, defaultNode != null
