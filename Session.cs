@@ -65,17 +65,24 @@ namespace CossacksLobby
         }
 
         [PackageHandler]
-        private void Login(int unknown1, int unknown2, LoginRequest request)
+        private void Login(int clientID, int unknown1, LoginRequest request)
         {
-            Account = CossacksHandler.Current.Account.FirstOrDefault(a => a.EMail == request.EMail && a.Password == request.Password && a.CDKey == request.CDKey);
+            Account = CossacksHandler.Current.Account.FirstOrDefault(a => a.EMail == request.EMail && a.CDKey == request.CDKey);
             if (Account != null)
             {
+                if (Account.Password != request.Password)
+                {
+                    Write(PackageNumber.ErrorResponse, clientID, unknown1, new { ErrorCode = 0x01 });
+                    Console.WriteLine("Invalid Password for {0}", request.EMail);
+                    return;
+                }
+
                 Player = new Player(Account);
                 EnterLobby();
             }
             else
             {
-                Console.WriteLine("User with {0} not found", request.EMail, request.CDKey);
+                Console.WriteLine("User with {0} not found", request.EMail);
             }
         }
 

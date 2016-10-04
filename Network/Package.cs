@@ -19,6 +19,7 @@ namespace CossacksLobby.Network
         ChatMessageResponse = 0x0197,
         CreateAccountRequest = 0x0198,
         LoginRequest = 0x019A,
+        ErrorResponse = 0x019B,
         EnterLobby = 0x019B,
         CreateRoomRequest = 0x019C,
         CreateRoomResponse = 0x019D,
