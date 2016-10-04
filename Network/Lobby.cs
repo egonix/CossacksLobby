@@ -11,12 +11,9 @@ namespace CossacksLobby.Network
     {
         public byte Unknown1 { get; set; }
         public string Nickname { get; set; }
-        public short Rank;
-        public int Unknown2 { get; set; }
-        public int Unknown3 { get; set; }
-        public int Unknown4 { get; set; }
-        public int Unknown5 { get; set; }
-        public int Unknown6 { get; set; }
+        public short Rank { get; set; }
+        [Unknown("0000000000000000000000000000000000000000")]
+        public byte[] _Unknown { get; set; }
         [ZeroTerminated]
         public List<Player> Players { get; set; }
         [ZeroTerminated]
