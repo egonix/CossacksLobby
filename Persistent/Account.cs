@@ -16,7 +16,10 @@ namespace CossacksLobby
         public string Nickname { get; set; }
         public string Password { get; set; }
         public string GameKey { get; set; }
-        public Int16 Rank { get; set; }
+        public string GameVersion { get; set; }
+        public string ProtocolVersion { get; set; }
+        public byte Unknown { get; set; }
+        public string DLC { get; set; }
 
         const string FileName = "Accounts.xml";
         static DataContractSerializer Serializer = new DataContractSerializer(typeof(Account[]));

@@ -19,6 +19,7 @@ namespace CossacksLobby
         public Int16 unknown2 { get; set; }
         public List<Session> Joined { get; }
         public int Unknown6 { get; set; }
+        public string RoomVersion { get; set; }
 
         public Room(Session host)
         {
@@ -101,6 +102,11 @@ namespace CossacksLobby
         public int UnknownEnd { get; set; }
     }
 
+    [Package(PackageNumber.RoomVersion)]
+    class RoomVersion
+    {
+        public string Version { get; set; }
+    }
 
     [Package(PackageNumber.RoomLeaveResponse)]
     class RoomLeaveResponse
@@ -177,6 +183,16 @@ namespace CossacksLobby
             // u1 = 66 Player u1 = 64 Host TODO
             Session player = Server.Temporary.Lobby.GetPlayer(p => p.ID == clientID);
             Room room = Server.Temporary.Lobby.GetRoom(this);
+        }
+
+        [PackageHandler]
+        private void RoomVersion(int clientID, int unknown, RoomVersion request)
+        {
+            Room room = Server.Temporary.Lobby.GetRoom(this);
+            if (room != null)
+                room.RoomVersion = request.Version;
+
+            // TODO JoinGame Version Check with clientid-version from 0x0065 request
         }
 
         [PackageHandler(PackageNumber.RoomLeaveRequest)]

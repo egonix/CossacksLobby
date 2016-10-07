@@ -30,13 +30,14 @@ namespace CossacksLobby
             {
                 Unknown1 = 0, // 0 = Bugs (Players)
                 Nickname = session.Account.Nickname,
-                Rank = session.Account.Rank,
+                Unknown = session.Account.Unknown,
                 Players = Players.Select(s => new EnterLobby.Player()
                 {
                     ID = s.ID,
                     Icon = s.Account.Icon,
                     Name = s.Account.Nickname,
-                    Rank = s.Account.Rank,
+                    Unknown = s.Account.Unknown,
+                    DLC = s.Account.DLC,
                 }).ToList(),
                 Rooms = Rooms.Select(g => new EnterLobby.Room()
                 {
@@ -55,7 +56,8 @@ namespace CossacksLobby
             Server.Write(Players, session.ID, 0, new NewPlayer()
             {
                 Nickname = session.Account.Nickname,
-                Rank = session.Account.Rank,
+                Unknown = session.Account.Unknown,
+                DLC = session.Account.DLC,
                 LoginSuccess = true,
             });
             Lock.ExitReadLock();

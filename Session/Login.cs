@@ -43,6 +43,9 @@ namespace CossacksLobby
             account.Nickname = request.Nickname;
             account.Password = request.Password;
             account.GameKey = request.GameKey;
+            account.GameVersion = request.GameVersion;
+            account.ProtocolVersion = request.ProtocolVersion;
+            account.DLC = request.DLC;
             Account = account;
             Server.Temporary.Lobby.Enter(this);
             Server.Persistent.Save();
@@ -68,6 +71,17 @@ namespace CossacksLobby
             {
                 Console.WriteLine("User with {0} not found", request.EMail);
             }
+        }
+
+        [PackageHandler]
+        private void Self(int unknown1, int unknown2, SelfRequest request)
+        {
+            Write(PackageNumber.SelfResponse, unknown1, unknown2, new
+            {
+                Nickname = request.Nickname,
+                Unknown = request.Unknown,
+                DLC = request.DLC
+            });
         }
     }
 }

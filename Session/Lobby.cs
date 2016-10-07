@@ -14,7 +14,8 @@ namespace CossacksLobby
             public int ID { get; set; }
             public byte Icon { get; set; }
             public string Name { get; set; }
-            public short Rank { get; set; }
+            public byte Unknown { get; set; }
+            public string DLC { get; set; }
         }
 
         public class Room
@@ -30,7 +31,7 @@ namespace CossacksLobby
 
         public byte Unknown1 { get; set; }
         public string Nickname { get; set; }
-        public short Rank { get; set; }
+        public short Unknown { get; set; }
         [Unknown("0000000000000000000000000000000000000000")]
         public byte[] _Unknown { get; set; }
         [ZeroTerminated]
@@ -39,11 +40,21 @@ namespace CossacksLobby
         public List<Room> Rooms { get; set; }
     }
 
+    [Package(PackageNumber.SelfRequest)]
+    public class SelfRequest
+    {
+        public string Password { get; set; }
+        public string Nickname { get; set; }
+        public byte Unknown { get; set; }
+        public string DLC { get; set; }
+    }
+
     [Package(PackageNumber.NewPlayer)]
     public class NewPlayer
     {
         public string Nickname { get; set; }
-        public short Rank { get; set; }
+        public byte Unknown { get; set; }
+        public string DLC { get; set; }
         public bool LoginSuccess { get; set; }
     }
 }
