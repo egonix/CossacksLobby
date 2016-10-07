@@ -17,9 +17,11 @@ namespace CossacksLobby
         public int UnknownID { get; set; }
         public int unknown1 { get; set; }
         public Int16 unknown2 { get; set; }
+        public byte unknown3 { get; set; }
         public List<Session> Joined { get; }
         public int Unknown6 { get; set; }
         public string RoomVersion { get; set; }
+        public string PCName { get; set; }
 
         public Room(Session host)
         {
@@ -28,7 +30,7 @@ namespace CossacksLobby
         }
     }
 
-    [Package(PackageNumber.CreateRoomRequest)]
+    [Package(PackageNumber.RoomCreateRequest)]
     class CreateRoomRequest
     {
         public byte Size1 { get; set; } // 07
@@ -38,7 +40,7 @@ namespace CossacksLobby
         public int unknown7 { get; set; }
     }
 
-    [Package(PackageNumber.CreateRoomResponse)]
+    [Package(PackageNumber.RoomCreateResponse)]
     class CreateRoomResponse
     {
         public byte Size1 { get; set; } // 07
@@ -46,6 +48,32 @@ namespace CossacksLobby
         public string NamePassword { get; set; }
         public int unknown6 { get; set; }
         public int unknown7 { get; set; }
+    }
+
+    [Package(PackageNumber.RoomJoinRequest)]
+    class RoomJoinRequest
+    {
+        public int HostID { get; set; }
+    }
+
+    [Package(PackageNumber.RoomJoinResponse)]
+    class RoomJoinResponse
+    {
+        public int HostID { get; set; }
+        public byte StateFlag { get; set; }
+    }
+
+    [Package(PackageNumber.RoomJoinRequest1)]
+    class RoomJoinRequest1
+    {
+        public int Unknown1 { get; set; }
+        public int Unknown2 { get; set; }
+        [Length(typeof(Int16))]
+        public string Nickname { get; set; }
+        public byte Unknown3 { get; set; }
+        public int ID { get; set; }
+        [Unknown("00000000000000")]
+        public byte[] _Unknown { get; set; }
     }
 
     [Package(PackageNumber.RoomInfoRequest1)]
@@ -146,12 +174,77 @@ namespace CossacksLobby
         }
 
         [PackageHandler]
+        private void RoomJoin(int clientID, int unknown, RoomJoinRequest request)
+        {
+            byte state = 0;
+            Session host = Server.Temporary.Lobby.GetPlayer(p => p.ID == request.HostID);
+            Room room = Server.Temporary.Lobby.GetRoom(host);
+            if (room != null && room.Joined.Count < room.MaxPlayers)
+                state = 0x03; // TODO check Room-JoinAble, 03 = OK
+
+            Write(PackageNumber.RoomJoinResponse, clientID, unknown, new RoomJoinResponse()
+            {
+                HostID = request.HostID,
+                StateFlag = state, 
+            });
+        }
+
+        [PackageHandler]
+        private void RoomJoin1(int clientID, int unknown, RoomJoinRequest1 request)
+        {
+            Session host = Server.Temporary.Lobby.GetPlayer(p => p.ID == clientID);
+            Room room = Server.Temporary.Lobby.GetRoom(host);
+            Write(PackageNumber.RoomInfoResponse, unknown, clientID, new RoomInfoResponse()
+            {
+                Size1 = room.MaxPlayers,
+                NamePassword = room.Name + '\t' + room.Password,
+                Options = room.Options,
+                JoinedPlayerIDs = room.Joined.Select(s => s.ID).ToList(),
+                Unknown1 = room.unknown1,
+                Unknown2 = room.unknown2,
+                Size2 = (byte)room.MaxPlayers,
+            });
+
+            Write(PackageNumber.RoomAdditionalInfo, 0, clientID, new
+            {
+                host.Account.ProtocolVersion,
+                host.Account.GameVersion,
+                end = 0,
+            });
+
+            Write(PackageNumber.RoomFullInfo, unknown, clientID, new
+            {
+                hostID = unknown,
+                info = new RoomInfoRequest1()
+                {
+                    NamePassword = room.Name + '\t' + room.Password,
+                    Options = room.Options,
+                    Size = room.MaxPlayers,
+                    Unknown = room.UnknownID,
+                    PCName = room.PCName,
+                    Unknown1 = room.unknown1,
+                    Unknown2 = room.unknown2,
+                    Unknown3 = room.unknown3,
+                },
+                playersCount = room.Joined.Count,
+                playerIDs = room.Joined.Select(p => p.ID).ToList(),
+                Unknown1 = (short)0,
+                HostNameLength = (short)room.Host.Account.Nickname.Length,
+                HostName = room.Host.Account.Nickname,
+                Unknown2 = (int)0,
+                Unknown3 = (short)1,
+                Unknown4 = (byte)0,
+            });
+        }
+
+        [PackageHandler]
         private void RoomInfo1(int clientID, int unknown, RoomInfoRequest1 request)
         {
             Room room = Server.Temporary.Lobby.GetRoom(this);
             room.Options = request.Options;
             room.MaxPlayers = request.Size;
             room.UnknownID = request.Unknown;
+            room.PCName = request.PCName;
         }
 
         [PackageHandler]
@@ -173,8 +266,11 @@ namespace CossacksLobby
             Write(clientID, unknown, response);
 
             //Broadcast
-            List<Session> players = Server.Temporary.Lobby.GetPlayers(p => p.ID != clientID);
-            Server.Write(players, clientID, unknown, response);
+            if (unknown == 0)
+            {
+                List<Session> players = Server.Temporary.Lobby.GetPlayers(p => p.ID != clientID);
+                Server.Write(players, clientID, unknown, response);
+            }
         }
 
         [PackageHandler]
