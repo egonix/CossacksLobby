@@ -71,8 +71,6 @@ namespace CossacksLobby
             Lock.EnterWriteLock();
             Rooms.Add(room);
             Lock.ExitWriteLock();
-
-            // TODO Broadcast
         }
 
         public void DeleteRoom(Room room)
@@ -88,6 +86,23 @@ namespace CossacksLobby
         {
             Lock.EnterReadLock();
             Room result = Rooms.FirstOrDefault(r=>r.Host == host);
+            Lock.ExitReadLock();
+            return result;
+        }
+
+        public Session GetPlayer(Func<Session, bool> exp)
+        {
+            Lock.EnterReadLock();
+            Session result = Players.FirstOrDefault(exp);
+            Lock.ExitReadLock();
+            return result;
+        }
+
+        public List<Session> GetPlayers(Func<Session, bool> exp)
+        {
+            Lock.EnterReadLock();
+            List<Session> result = Players.Where(exp)
+                .ToList();
             Lock.ExitReadLock();
             return result;
         }

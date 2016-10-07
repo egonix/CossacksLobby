@@ -29,6 +29,7 @@ namespace CossacksLobby
         RoomLeaveRequest = 0x01A0,
         RoomLeaveResponse = 0x01A1,
         //StartGame: 0x01BB, 0x01A2, 0x456, 0x457, 0x460, 0x461
+        RoomPlayerOption = 0x01BB,
         //0x019F 
         //0x01A1 
         //0x01A3 

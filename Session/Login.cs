@@ -25,7 +25,8 @@ namespace CossacksLobby
         public string Password { get; set; }
         public string GameKey { get; set; }
         public string Nickname { get; set; }
-        public short Unknown { get; set; }
+        public byte Unknown { get; set; }
+        public string DLC { get; set; }
     }
 
     partial class Session
@@ -44,20 +45,28 @@ namespace CossacksLobby
             account.GameKey = request.GameKey;
             Account = account;
             Server.Temporary.Lobby.Enter(this);
+            Server.Persistent.Save();
         }
 
         [PackageHandler]
         private void Login(int unknown1, int unknown2, LoginRequest request)
         {
             Account account;
-            if (Persistent.TryGetAccount(request.EMail, out account) && account.Password == request.Password && account.GameKey == request.GameKey)
+            if (Persistent.TryGetAccount(request.EMail, out account) && account.GameKey == request.GameKey)
             {
+                if (account.Password != request.Password)
+                {
+                    Write(PackageNumber.ErrorResponse, unknown1, unknown2, 0x01);
+                    Console.WriteLine("Invalid Password for {0}", request.EMail);
+                    return;
+                }
+
                 Account = account;
                 Server.Temporary.Lobby.Enter(this);
             }
             else
             {
-                Console.WriteLine("User with {0} not found", request.EMail, request.GameKey);
+                Console.WriteLine("User with {0} not found", request.EMail);
             }
         }
     }

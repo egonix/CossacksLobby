@@ -10,6 +10,20 @@ static class Log
     {
         ToConsole(DateTime.Now, message);
     }
+
+    public static void Debug(string message, byte[] buffer, int count)
+    {
+        int offset = 0;
+        count += 14;
+
+        StringBuilder sb = new StringBuilder(message.Length + count * 2);
+        sb.AppendLine(message);
+        for (int i = 0; i < offset + count; i++)
+            sb.AppendFormat("{0:x2} ", buffer[offset + i]);
+
+        ToConsole(DateTime.Now, sb.ToString());
+    }
+
     public static void Info(string message)
     {
         ToConsole(DateTime.Now, message);

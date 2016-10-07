@@ -86,6 +86,22 @@ namespace CossacksLobby
         public byte Size2 { get; set; }
     }
 
+    [Package(PackageNumber.RoomPlayerOption)]
+    class RoomPlayerOption
+    {
+        public int Unknown1 { get; set; }
+        public int Unknown2 { get; set; }
+        public int Unknown3 { get; set; }
+        public int Unknown4 { get; set; }
+        public int Unknown5 { get; set; }
+        public int Unknown6 { get; set; }
+        public byte Unknown7 { get; set; }
+        [Length(typeof(Int32))]
+        public string Options { get; set; }
+        public int UnknownEnd { get; set; }
+    }
+
+
     [Package(PackageNumber.RoomLeaveResponse)]
     class RoomLeaveResponse
     {
@@ -137,7 +153,8 @@ namespace CossacksLobby
         {
             Room room = Server.Temporary.Lobby.GetRoom(this);
             room.Options = request.Options;
-            Write(clientID, unknown, new RoomInfoResponse()
+
+            RoomInfoResponse response = new RoomInfoResponse()
             {
                 Size1 = room.MaxPlayers,
                 NamePassword = request.NamePassword,
@@ -146,14 +163,29 @@ namespace CossacksLobby
                 Unknown1 = room.unknown1,
                 Unknown2 = room.unknown2,
                 Size2 = (byte)room.MaxPlayers,
-            });
+            };
+            Write(clientID, unknown, response);
+
+            //Broadcast
+            List<Session> players = Server.Temporary.Lobby.GetPlayers(p => p.ID != clientID);
+            Server.Write(players, clientID, unknown, response);
+        }
+
+        [PackageHandler]
+        private void RoomPlayerOption(int clientID, int unknown, RoomPlayerOption request)
+        {
+            // u1 = 66 Player u1 = 64 Host TODO
+            Session player = Server.Temporary.Lobby.GetPlayer(p => p.ID == clientID);
+            Room room = Server.Temporary.Lobby.GetRoom(this);
         }
 
         [PackageHandler(PackageNumber.RoomLeaveRequest)]
         private void LeaveRoom(int clientID, int unknown)
         {
             Room room = Server.Temporary.Lobby.GetRoom(this);
-            Server.Temporary.Lobby.DeleteRoom(room);
+            if(clientID == room.Host.ID)
+                Server.Temporary.Lobby.DeleteRoom(room);
+
             Write(clientID, unknown, new RoomLeaveResponse()
             {
                 unknown1 = 0x01,
