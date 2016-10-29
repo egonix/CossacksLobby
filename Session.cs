@@ -45,11 +45,8 @@ namespace CossacksLobby
         [UnknownPackageHandler]
         private Task UnknownPackage(PackageNumber number, int unknown1, int unknown2, byte[] buffer, int offset, int count)
         {
-#if DEBUG
-            Log.Debug($"Unknown Package: {number}", buffer, count);
-#else
             Log.Info($"Unknown Package: {number}");
-#endif
+            Log.Debug("Unknown Package Content", buffer, count);
             return Task.FromResult(0);
         }
 
