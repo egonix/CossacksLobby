@@ -77,6 +77,10 @@ namespace CossacksLobby.Network
                     }
                 }
             }
+            catch (Exception e)
+            {
+                Log.Critical("Session crashed with: " + e.ToString());
+            }
             finally
             {
                 Client.Client.Shutdown(SocketShutdown.Both);
