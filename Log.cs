@@ -16,13 +16,13 @@ static class Log
     public static LogLevel Level;
 
     public static void Debug(string message) { Append(LogLevel.Debug, message); }
-    public static void Debug(string message, byte[] buffer, int count) { Append(LogLevel.Debug, message, buffer, count)); }
+    public static void Debug(string message, byte[] buffer, int count) { Append(LogLevel.Debug, message, buffer, count); }
 
     public static void Info(string message) { Append(LogLevel.Debug, message); }
-    public static void Info(string message, byte[] buffer, int count) { Append(LogLevel.Debug, message, buffer, count)); }
+    public static void Info(string message, byte[] buffer, int count) { Append(LogLevel.Debug, message, buffer, count); }
 
     public static void Critical(string message) { Append(LogLevel.Debug, message); }
-    public static void Critical(string message, byte[] buffer, int count) { Append(LogLevel.Debug, message, buffer, count)); }
+    public static void Critical(string message, byte[] buffer, int count) { Append(LogLevel.Debug, message, buffer, count); }
 
     public static void Append(LogLevel level, string message)
     {
