@@ -145,6 +145,20 @@ namespace CossacksLobby
         public byte unknown3 { get; set; } // 01
     }
 
+    [Package(PackageNumber.RoomStartGameRequest)]
+    class RoomStartGameRequest
+    {
+        public List<int> HumanPlayerIDs { get; set; }
+        public byte unknown { get; set; } // 00
+    }
+
+    [Package(PackageNumber.RoomStartGameResponse)]
+    class RoomStartGameResponse
+    {
+        public List<int> HumanPlayerIDs { get; set; }
+        public byte unknown { get; set; } // 0F
+    }
+
     partial class Session
     {
         [PackageHandler]
@@ -289,6 +303,19 @@ namespace CossacksLobby
                 room.RoomVersion = request.Version;
 
             // TODO JoinGame Version Check with clientid-version from 0x0065 request
+        }
+
+        [PackageHandler]
+        private void RoomStartGame(int clientID, int unknown, RoomStartGameRequest request)
+        {
+            Room room = Server.Temporary.Lobby.GetRoom(this);
+
+            // TODO Host<->Clients communication (clientID, unknown)
+            Write(PackageNumber.RoomStartGameResponse, clientID, unknown, new RoomStartGameResponse()
+            {
+                HumanPlayerIDs = room.Joined.Select(p => p.ID).ToList(),
+                unknown = 0x0F,
+            });
         }
 
         [PackageHandler(PackageNumber.RoomLeaveRequest)]

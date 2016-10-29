@@ -37,6 +37,10 @@ namespace CossacksLobby
         RoomPlayerOption = 0x01BB,
         SelfRequest = 0x01B3,
         SelfResponse = 0x01B4,
+        RoomStartGameRequest = 0x01A2, // if not answered connection get closed via client but game runs local
+        RoomStartGameResponse = 0x01A3,
+        RoomGame1 = 0x456,
+        RoomGame2 = 0x457,
         //StartGame: 0x01A2, 0x456, 0x457, 0x460, 0x461
         //0x019F 
         //0x01A1 

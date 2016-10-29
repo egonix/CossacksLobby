@@ -65,7 +65,9 @@ namespace CossacksLobby
 
         public void Exit(Session session)
         {
-            throw new NotImplementedException();
+            Lock.EnterWriteLock();
+            Players.Remove(session);
+            Lock.ExitWriteLock();
         }
 
         public void AddRoom(Room room)

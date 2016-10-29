@@ -8,11 +8,14 @@ static class Log
 {
     public static void Debug(string message)
     {
+#if DEBUG
         ToConsole(DateTime.Now, message);
+#endif
     }
 
     public static void Debug(string message, byte[] buffer, int count)
     {
+#if DEBUG
         int offset = 0;
         count += 14;
 
@@ -22,6 +25,7 @@ static class Log
             sb.AppendFormat("{0:x2} ", buffer[offset + i]);
 
         ToConsole(DateTime.Now, sb.ToString());
+#endif
     }
 
     public static void Info(string message)

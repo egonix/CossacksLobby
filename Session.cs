@@ -30,9 +30,7 @@ namespace CossacksLobby
 
         protected override Task HandlePackage(PackageNumber number, int unknown1, int unknown2, byte[] buffer, int offset, int count)
         {
-#if DEBUG
             Log.Debug($"{number} {count}", buffer, count);
-#endif
             try
             {
                 return Dispatcher(this, number, unknown1, unknown2, buffer, offset, count);
@@ -50,7 +48,7 @@ namespace CossacksLobby
 #if DEBUG
             Log.Debug($"Unknown Package: {number}", buffer, count);
 #else
-            Console.WriteLine($"Unknown Package: {number}");
+            Log.Info($"Unknown Package: {number}");
 #endif
             return Task.FromResult(0);
         }

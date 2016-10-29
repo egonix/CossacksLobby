@@ -36,8 +36,11 @@ namespace CossacksLobby
 
         public void Remove(Session session)
         {
+            Log.Info($"connection closed from {session.Account.Nickname} ({session.Account.EMail})");
+
             SessionsLock.EnterWriteLock();
             session.Stop().Wait();
+            Sessions.Remove(session);
             SessionsLock.ExitWriteLock();
         }
 
