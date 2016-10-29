@@ -52,7 +52,7 @@ namespace CossacksLobby.Network
                 {
                     int reserved = offset + count;
                     int n = await Stream.ReadAsync(buffer, reserved, buffer.Length - reserved, cancellationToken);
-                    if (n == 0) throw new EndOfStreamException();
+                    if (n == 0) return;
                     count += n;
                     while (packetizer.GetNextPackage(buffer, ref offset, ref count))
                     {
