@@ -26,6 +26,7 @@ static class Log
 
     public static void Append(LogLevel level, string message)
     {
+        if (level < Level) return;
         DateTime dateTime = DateTime.Now;
         ToConsole(dateTime, message);
     }
